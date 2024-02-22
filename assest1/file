@@ -1,0 +1,101 @@
+NAME: assets
+LAST DEPLOYED: Sat Feb 17 15:21:17 2024
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+TEST SUITE: None
+HOOKS:
+MANIFEST:
+---
+# Source: assets/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: assets
+---
+# Source: assets/templates/cm1.yaml
+apiVersion: v1
+data:
+  PORT: "8080"
+kind: ConfigMap
+metadata:
+  name: assets
+---
+# Source: assets/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: assets
+  
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/component: service
+    app.kubernetes.io/instance: assets
+    app.kubernetes.io/name: assets
+---
+# Source: assets/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assets
+  labels:
+    app.kubernetes.io/component: service
+    app.kubernetes.io/created-by: retail-store-sample
+    app.kubernetes.io/instance: assets
+    app.kubernetes.io/name: assets
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: service
+      app.kubernetes.io/instance: assets
+      app.kubernetes.io/name: assets
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: service
+        app.kubernetes.io/created-by: retail-store-sample
+        app.kubernetes.io/instance: assets
+        app.kubernetes.io/name: assets
+    spec:
+      serviceAccountName: assets
+      securityContext:
+        {}
+      containers:
+        - name: assets
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+          image: "public.ecr.aws/aws-containers/retail-store-sample-assets:0.2.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health.html
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 3
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 128m
+              memory: 128Mi
+
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=assets,app.kubernetes.io/instance=assets" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
